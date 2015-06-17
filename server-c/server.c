@@ -1,4 +1,4 @@
-#include <stdio.h>
+ #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -231,7 +231,7 @@ void receivedBuff(int cliet_fd_index,char* rcvbuf,int isHost)
             
             distributeCloudService(buf,backCmd);
             
-            if( ret = send(fd_Slave[cliet_fd_index], backCmd, BUFFER_SIZE, 0)< BUFFER_SIZE )		// feed back slave cloutservice cmd
+            if( ret = send(fd_Slave[cliet_fd_index], backCmd, BUFFER_SIZE, 0)< BUFFER_SIZE )		// feed back slave cloudservice cmd
             {
                 printf("Send failed\n");
                 //break;
@@ -244,9 +244,18 @@ void receivedBuff(int cliet_fd_index,char* rcvbuf,int isHost)
 		{
 			
             char backCmd[BUFFER_SIZE];
+            int bufChkBitBase;
             bzero(backCmd,BUFFER_SIZE);
             printf("No host client exist\n");
-            sprintf(backCmd,"%s:NOHO:[Server]No host client exist",ERRORSTATUS);
+            //sprintf(backCmd,"%s:NOHO:[Server]No host client exist",ERRORSTATUS);
+
+            strcpy(backCmd,buf);
+            bufChkBitBase = (CMDperLenth+1)*1;
+            backCmd[bufChkBitBase] = 'N';
+            backCmd[bufChkBitBase+1] = 'H';
+            backCmd[bufChkBitBase+2] = 'S';
+            backCmd[bufChkBitBase+3] = 'T';
+
             if( ret = send(fd_Slave[cliet_fd_index], backCmd, BUFFER_SIZE, 0)< BUFFER_SIZE )		// back to slave the error info
             {
                 printf("Send failed\n");
