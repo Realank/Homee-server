@@ -89,6 +89,7 @@ def unpackDownloadCmd(cmd):
 		print 'code is '+code
 		unpackCmd = cmd[10:-5]
 		if uploadMsgLog.has_key(code):
+			print 'unpack dl cmd: find socket by code'
 			s = uploadMsgLog[code]
 			del uploadMsgLog[code]
 			if s in slaveRlists:
@@ -122,9 +123,13 @@ def handleUploadMessage(s,cmd):
 	ret,handledMsg = handleCloudMsgForSlave(cmd)
 	if ret:
 			s.send(handledMsg)
+			slaveRlists.remove(s)
+			s.close()
 	else:
 		if len(hostRlists) <= 1:
 			s.send("NHST:SEVR:No host client exist")
+			slaveRlists.remove(s)
+			s.close()
 		else:
 			for host in hostRlists[1:]:
 				host.send(packageUploadCmd(s,cmd))
@@ -133,12 +138,18 @@ def handleUploadMessage(s,cmd):
 def handleDownloadMessage(cmd):
 	cmd = trimString(cmd)
 	print 'handleDownloadMessage:['+cmd+'] Begin====='
-	ret = handleCloudMsgForHost(cmd)
-	if ret == False:
-		slave,unpackCmd=unpackDownloadCmd(cmd)
-		if slave != None:
-			slave.send(unpackCmd)
-			print 'handleDownloadMessage:['+cmd+'] End====='
+	cmdArray = cmd.split(END)[:-1]
+	for i in range(0,len(cmdArray)):
+		cmdArray[i] += END
+	for cmd in cmdArray:
+		ret = handleCloudMsgForHost(cmd)
+		if ret == False:
+			slave,unpackCmd=unpackDownloadCmd(cmd)
+			if slave != None:
+				slave.send(unpackCmd)
+				slaveRlists.remove(slave)
+				slave.close()
+				print 'handleDownloadMessage:['+cmd+'] End====='
 
 def runServer(port,isHost):
 	import socket
@@ -167,9 +178,11 @@ def runServer(port,isHost):
 		limitedClients = SLAVE_CLIENT_NUM
 
 	rlists.append(sock)
-	timeout=6 
+	timeout=10 
 	while True:   
+
 		rs,ws,es=select.select(rlists,wlists,rlists,timeout)  
+		print serverInfo + 'while loop---------:'+ str(len(rlists[1:])) + '||' + str(len(wlists))
 		#timeout
 		if not(rs or ws or es): 
 			global hostTimeoutTimes
@@ -177,13 +190,14 @@ def runServer(port,isHost):
 				print serverInfo + 'timeout (hostTimeoutTimes:' + str(hostTimeoutTimes) + ') ...' 
 			else:
 				print serverInfo + 'timeout...'
-			if isHost and len(rlists) > 1:
+			if isHost==True and len(rlists) > 1:
 				hostTimeoutTimes+=1
 				if hostTimeoutTimes>6:
 					print '[HOST]client no response, close'
-					for host in rlists[1:]:
-						host.close()
-					rlists = rlists[:1]
+					for i in range(len(rlists)-1,0,-1):
+						rlists[i].close()
+						del rlists[i]
+					#rlists = rlists[:1]#bug
 					global uploadMsgLog
 					for index in uploadMsgLog.keys():
 						del uploadMsgLog[index]
@@ -191,6 +205,12 @@ def runServer(port,isHost):
 				else:
 					for host in rlists[1:]:
 						host.send(START+':'+'0000'+':'+STATUS+':'+CHECK+':'+HOSTSIDE+':'+PULSE+':'+END)
+			if isHost==False and len(rlists) > 1:
+				print '[SLAVE]clean useless sockets that not respense'
+				#rlists = rlists[:1]
+				for i in range(len(rlists)-1,0,-1):
+					rlists[i].close()
+					del rlists[i]
 			continue
 
 		#读部分  
@@ -227,7 +247,7 @@ def runServer(port,isHost):
 					print serverInfo + 'close socket in rs'
 					s.close()
 					del msg_que[s]
-		#写部分
+		#写部分--useless
 		for  s in ws:  
 			try:
 				if msg_que.has_key(s):
@@ -241,6 +261,7 @@ def runServer(port,isHost):
 				####回复数据####
 				print serverInfo + 'reply '+msg
 				s.send(msg)
+				s.close()
 
         #异常部分      
 		for s in es:
@@ -253,7 +274,6 @@ def runServer(port,isHost):
 			s.close()  
 			del msg_que[s]
 
-		print serverInfo + 'while loop---------:'+ str(len(rlists[1:])) + '||' + str(len(wlists))
 
 
 
