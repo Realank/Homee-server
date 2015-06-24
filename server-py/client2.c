@@ -84,7 +84,7 @@ int lightCtl(char* area, char* isCheck, char* setValue)
     return -1;
 }
 
-void distributeHomeService(char* buf,char* backCmd)
+int distributeHomeService(char* buf,char* backCmd)
 {
     int i;
     char seperateCmd[socketCMDnum][CMDperLenth+1];
@@ -152,7 +152,13 @@ void distributeHomeService(char* buf,char* backCmd)
         }
     }
 
-    
+    else if(!strcmp(seperateCmd[2],ERRORSTATUS))
+    {
+        printf("%s",backCmd);
+        return 0;
+    }
+
+    // has bugs in here, feedback standard cmd
     else // can't find cmd, just back it
     {
         sprintf(backCmd,"%s:%s:%s:%s",seperateCmd[0],seperateCmd[1],seperateCmd[2],BACK);
@@ -162,6 +168,7 @@ void distributeHomeService(char* buf,char* backCmd)
             strcat(backCmd,seperateCmd[i]);
         }
     }
+    return 1;
     
     
 }
@@ -258,14 +265,19 @@ int handle(int sock_fd)
             }
             else {
                 //server response
+                int ret;
                 printf("rcvcmd is %s\n",rcv_buffer);
                 bzero(back_buffer,BUFFER_SIZE);
-                distributeHomeService(rcv_buffer,back_buffer);
-                printf("feedback cmd %s\n", back_buffer);
-                if(send(sock_fd,back_buffer,strlen(back_buffer),0)<strlen(back_buffer))
-                {
-                    printf("send error\n");
+                ret = distributeHomeService(rcv_buffer,back_buffer);
+                
+                if(ret){
+                    printf("feedback cmd %s\n", back_buffer);
+                    if(send(sock_fd,back_buffer,strlen(back_buffer),0)<strlen(back_buffer))
+                    {
+                        printf("send error\n");
+                    }
                 }
+               
                 bzero(rcv_buffer,BUFFER_SIZE);
                 
 

@@ -222,9 +222,17 @@ def runServer(port,isHost):
 				print serverInfo + 'connect by',addr  
 				conn.setblocking(False)  
 				if(len(rlists) > limitedClients):
-					print serverInfo + 'max connections arrive, exit'
-					conn.send('ERRR:TMCL:Too many clients, bye')
-					conn.close()
+					if isHost==False:
+						print serverInfo + 'max connections arrive, exit'
+						conn.send('ERRR:TMCL:Too many clients, bye')
+						conn.close()
+					else:
+						print serverInfo + 'max connections arrive, clear out the old, can let new in'
+						old = rlists[1]
+						rlists = rlists[:1]+rlists[2:]
+						rlists.append(conn)
+						old.send('ERRR:TMCL:Too many clients,old should be cleared, bye')
+						old.close()
 				else:
 					rlists.append(conn)
 					#使用字典将conn与一个队列相对应  
