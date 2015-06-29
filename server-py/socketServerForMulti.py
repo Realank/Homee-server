@@ -166,17 +166,17 @@ def runServer(port,isHost):
 	sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
 	sock.bind(server)
 	sock.listen(5)
+	##
+	rlists=slaveRlists
+	wlists=slaveWlists
+	msg_que=slaveMsg_que
+	limitedClients = SLAVE_CLIENT_NUM
 	if isHost == True:
 		rlists=hostRlists
 		wlists=hostWlists
 		msg_que=hostMsg_que
 		limitedClients = HOST_CLIENT_NUM
-	else:
-		rlists=slaveRlists
-		wlists=slaveWlists
-		msg_que=slaveMsg_que
-		limitedClients = SLAVE_CLIENT_NUM
-
+	##
 	rlists.append(sock)
 	timeout=10 
 	while True:   
@@ -224,14 +224,16 @@ def runServer(port,isHost):
 				if(len(rlists) > limitedClients):
 					if isHost==False:
 						print serverInfo + 'max connections arrive, exit'
-						conn.send('ERRR:TMCL:Too many clients, bye')
+						conn.send(START+':'+'ERRR:TMCL:Too many clients, bye'+END)
 						conn.close()
 					else:
-						print serverInfo + 'max connections arrive, clear out the old, can let new in'
+						print serverInfo + 'max connections arrive, clear out the old, and let new in'
 						old = rlists[1]
-						rlists = rlists[:1]+rlists[2:]
+						del rlists[1]
 						rlists.append(conn)
-						old.send('ERRR:TMCL:Too many clients,old should be cleared, bye')
+						msg_que[conn]=RealankQueue()
+						old.send(START+':'+'ERRR:TMCL:Too many clients,old should be cleared, bye'+END)
+						del msg_que[old]
 						old.close()
 				else:
 					rlists.append(conn)

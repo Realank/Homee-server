@@ -152,10 +152,10 @@ int distributeHomeService(char* buf,char* backCmd)
         }
     }
 
-    else if(!strcmp(seperateCmd[2],ERRORSTATUS))
+    else if(!strcmp(seperateCmd[1],ERRORSTATUS))
     {
-        printf("%s",backCmd);
-        return 0;
+        printf("Error cmd from server: %s",backCmd);
+        return -1;
     }
 
     // has bugs in here, feedback standard cmd
@@ -192,18 +192,22 @@ int main()
         inet_pton(AF_INET, SERVERIP, &servaddr.sin_addr);
 
         if (connect(sock_fd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
-            printf("[client]Can Not Connect To %s, wait 5 minute to retry!\n",SERVERIP);
+            printf("[client:%d]Can Not Connect To %s, wait 5 minute to retry!\n",sock_fd,SERVERIP);
             sleep(5*60);
             continue;
             //return -1;
         }
-        printf("[client]Connect success\n");
+        printf("[client:%d]Connect success\n",sock_fd);
 
         ret = handle(sock_fd);     /* do it all */
-        if(ret<0)
+        if(ret==0)
         {
-            printf("[client]fatal error, wait 5 min to retry!\n");
+            printf("[client:%d]fatal error, wait 5 min to retry!\n",sock_fd);
             sleep(5*60);
+        }else if (ret<0){
+        	printf("[client:%d]client is too much, close myself!\n",sock_fd);
+        	close(sock_fd);
+        	return 0;
         }
         
         close(sock_fd);
@@ -236,7 +240,7 @@ int handle(int sock_fd)
         ret = select(maxfds, &fdsr, NULL, NULL, &tv);
 		if (ret < 0)
 		{
-			printf("[client]select error\n");
+			printf("[client:%d]select error\n",sock_fd);
             return -1;
 		}
 		else if (ret == 0)
@@ -245,10 +249,10 @@ int handle(int sock_fd)
             if(connectDisconnectTimes>6)
             {
                 //network bad, re-connect
-                printf("[client]network bad, re-connect\n");
+                printf("[client]network bad, re-connect\n",sock_fd);
                 return 0;
             }
-			printf("[client]timeout, loopback\n");
+			printf("[client:%d]timeout, loopback\n",sock_fd);
 			continue;
 		}
 
@@ -256,26 +260,31 @@ int handle(int sock_fd)
             //received server responce
             nread = recv(sock_fd, rcv_buffer, BUFFER_SIZE,0);
             if (nread == 0) {
-                printf("[client]server close the connection\n");
+                printf("[client:%d]server close the connection\n",sock_fd);
                 return 0;
             } 
             else if (nread < 0) {
-                perror("[client]read error");
+                printf("[client:%d]read error",sock_fd);
                 return 0;
             }
             else {
                 //server response
                 int ret;
-                printf("rcvcmd is %s\n",rcv_buffer);
+                printf("[client:%d]rcvcmd is %s\n",sock_fd,rcv_buffer);
                 bzero(back_buffer,BUFFER_SIZE);
                 ret = distributeHomeService(rcv_buffer,back_buffer);
                 
-                if(ret){
-                    printf("feedback cmd %s\n", back_buffer);
+                if(ret>0){
+                    printf("[client:%d]feedback cmd %s\n",sock_fd, back_buffer);
                     if(send(sock_fd,back_buffer,strlen(back_buffer),0)<strlen(back_buffer))
                     {
-                        printf("send error\n");
+                        printf("[client:%d]send error\n",sock_fd);
                     }
+                }else if (ret == 0){
+
+                }else{
+                	printf("[client:%d]fetal error, exit\n",sock_fd);
+                	return -1;
                 }
                
                 bzero(rcv_buffer,BUFFER_SIZE);
